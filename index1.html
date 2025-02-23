@@ -108,18 +108,38 @@
 <body>
   <h1>🌍 WebSIG - Surveillance et alerte des Inondations</h1>
   
-  <!-- Formulaire d'authentification -->
-  <div id="authContainer">
-    <input type="email" id="email" placeholder="Email">
-    <input type="password" id="password" placeholder="Mot de passe">
-    <a href="home.html"><button onclick="inscrireUtilisateur()">S'inscrire</button></a>
-    <a href="home.html"><button onclick="connexionUtilisateur()">Se connecter</button></a> 
-    <button onclick="deconnexionUtilisateur()">Se déconnecter</button>
-    <button onclick="simulerAndroid()">Simuler connexion Android</button>
+ 
+  
+  <!-- Conteneur principal (affiché après inscription/connexion) -->
+  <div id="mainContainer">
+    <div id="mapContainer">
+      <div id="map"></div>
+      <canvas id="rainCanvas"></canvas>
+    </div>
   </div>
   
- 
-    
+  <!-- Bouton pour afficher/cacher la légende -->
+  <button id="toggleLegend">Masquer la légende</button>
+  
+  <!-- Panneau de légende draggable -->
+  <div id="legend">
+    <b>Légende</b><br>
+    <div style="display:inline-flex; align-items:center;">
+      <div style="position: relative; width:48px; height:48px;">
+        <img src="https://img.icons8.com/fluency/48/000000/weather-station.png" style="width:48px;height:48px;">
+        <img src="https://img.icons8.com/fluency/16/000000/radio-tower.png" style="width:16px;height:16px; position: absolute; top:-4px; left:16px;">
+      </div>&nbsp; Capteur IoT (Station avec antenne)
+    </div><br>
+    <b>Paramètres mesurés :</b><br>
+    <img src="https://img.icons8.com/fluency/24/000000/water.png" width="16" height="16"> Niveau d'eau<br>
+    <img src="https://img.icons8.com/fluency/24/000000/temperature.png" width="16" height="16"> Température<br>
+    <img src="https://img.icons8.com/fluency/24/000000/hygrometer.png" width="16" height="16"> Humidité<br>
+    <img src="https://img.icons8.com/fluency/24/000000/barometer.png" width="16" height="16"> Pression<br>
+    <img src="https://img.icons8.com/fluency/24/000000/raindrop.png" width="16" height="16"> Précipitations<br>
+    <img src="https://img.icons8.com/fluency/24/000000/landscape.png" width="16" height="16"> Altitude<br>
+    <b>Alertes :</b><br>
+    Débordement du fleuve : Niveau d'eau > 4.0 m (rouge)<br>
+    Maisons inondées : Précipitations > 100 mm (bleu)
   </div>
   
   <script>
