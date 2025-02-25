@@ -161,11 +161,10 @@
     
     /********* Définition des 4 capteurs installés le long du fleuve *********/
     var sensorsData = [
-      { id: 1, name: "Capteur 1 - Bord du Fleuve", lat: 13.485027, lng: 2.115111, altitude: 5.0, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
-      { id: 2, name: "Capteur 2 - Bord du Fleuve", lat: 13.518748, lng: 2.090952, altitude: 5.5, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
-      { id: 3, name: "Capteur 3 - Bord du Fleuve", lat: 13.531022, lng: 2.042149, altitude: 4.5, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
-      { id: 4, name: "Capteur 4 - Bord du Fleuve", lat: 13.498162, lng: 2.120429, altitude: 6.0, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null }
-    ];
+    { id: 1, name: "Capteur 1 - Bord du Fleuve", lat: 13.473472, lng: 2.127530, altitude: 5.0, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
+    { id: 2, name: "Capteur 2 - Bord du Fleuve", lat: 13.496835, lng: 2.115979, altitude: 5.5, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
+    { id: 3, name: "Capteur 3 - Bord du Fleuve", lat: 13.511860, lng: 2.089501, altitude: 4.5, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
+    { id: 4, name: "Capteur 4 - Bord du Fleuve", lat: 13.519907, lng: 2.072473, altitude: 6.0, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null }
     
     sensorsData.forEach(function(sensor) {
       sensor.marker = L.marker([sensor.lat, sensor.lng], { icon: sensorIcon }).addTo(map);
