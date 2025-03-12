@@ -3,410 +3,634 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebSIG - Surveillance et alerte des Inondations</title>
-  
+  <title>SIG-Inondation - Système d'Alerte Précoce</title>
+  <!-- Feuilles de style -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-  <!-- Plugin pour effet 3D (Leaflet.TiltShift) -->
-  <script src="https://unpkg.com/leaflet-tiltshift/Leaflet.TiltShift.js"></script>
-  <!-- Leaflet CSS -->
- 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    /* Styles personnalisés */
     body {
       font-family: Arial, sans-serif;
-      background-color: #dff6ff;
-      margin: 0;
-      padding: 0;
-      text-align: center;
     }
-    h1 {
-      color: #00695c;
-      margin: 20px;
-    }
-    /* Formulaire d'authentification visible au chargement */
-    #authContainer {
-      margin: 20px;
-    }
-    #authContainer input, #authContainer button {
-      padding: 10px;
-      margin: 5px;
-      width: 200px;
-    }
-    #authContainer button {
-      background-color: #00796b;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    #authContainer button:hover {
-      background-color: #004d40;
-    }
-    /* Conteneur principal (carte + légende) – caché avant inscription/connexion */
-    #mainContainer {
-      display: none;
-      height: calc(100vh - 40px);
-      display: flex;
-      flex-direction: row;
-    }
-    /* Conteneur de la carte */
-    #mapContainer {
-      flex: 3;
-      position: relative;
-    }
+
     #map {
-      height: 100%;
+      height: 70vh;
       width: 100%;
-      border: 2px solid #00695c;
-      transform: perspective(1800px) rotateX(5deg);
-      transform-style: preserve-3d;
     }
-    /* Canvas pour l'effet de précipitations */
-    #rainCanvas {
+
+    .sensor-marker {
+      font-size: 24px;
+      color: #007bff;
+    }
+
+    .status-critical {
+      color: #dc3545;
+    }
+
+    .status-warning {
+      color: #ffc107;
+    }
+
+    .status-normal {
+      color: #28a745;
+    }
+
+    .map-control {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+    }
+
+    .sensor-popup {
+      font-size: 14px;
+    }
+
+    .sensor-property {
+      margin-bottom: 5px;
+    }
+
+    /* Effet de pluie */
+    .rain-effect {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 5000;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
     }
-    /* Bouton de bascule pour la légende (toujours visible) */
-    #toggleLegend {
+
+    .rain-effect.active {
+      display: block;
+    }
+
+    .rain {
       position: absolute;
-      bottom: 10px;
-      left: 10px;
-      z-index: 1100;
-      background: #00796b;
-      color: white;
-      padding: 5px 10px;
-      border: none;
-      border-radius: 3px;
-      cursor: pointer;
+      width: 2px;
+      height: 50px;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
+      animation: fall 1s linear infinite;
     }
-    /* Le panneau de légende est draggable */
-    #legend {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      background: rgba(255,255,255,0.9);
-      padding: 10px;
-      font-size: 14px;
-      border-radius: 5px;
-      box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
-      cursor: move;
-      z-index: 1100;
-    }
-    /* Sur mobile, la légende est cachée par défaut */
-    @media (max-width: 767px) {
-      #legend {
-        display: none;
+
+    @keyframes fall {
+      to {
+        transform: translateY(100vh);
       }
+    }
+
+    /* Légende */
+    .legend {
+      padding: 10px;
+      background: white;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      display: none; /* Cache par défaut */
+    }
+
+    .legend.active {
+      display: block; /* Affiche la légende */
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      border-radius: 50%;
+    }
+
+    .legend-label {
+      font-size: 14px;
+    }
+
+    /* Style pour le graphique */
+    #waterLevelChart {
+      width: 100% !important;
+      height: 300px !important;
+    }
+
+    /* Styles pour les différentes vues */
+    .view {
+      display: none;
+    }
+
+    .view.active {
+      display: block;
     }
   </style>
 </head>
 <body>
-  <h1>🌍 WebSIG - Surveillance et alerte des Inondations</h1>
-  
- 
-  
-  <!-- Conteneur principal (affiché après inscription/connexion) -->
-  <div id="mainContainer">
-    <div id="mapContainer">
-      <div id="map"></div>
-      <canvas id="rainCanvas"></canvas>
+  <!-- Barre de navigation -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">
+        <i class="fas fa-water me-2"></i>SIG-Inondation
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item"><a class="nav-link active" href="#" data-view="map">Carte</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" data-view="sentinel">Données Sentinel</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" data-view="predictions">Prédictions</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" data-view="historical">Historique</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" data-view="settings">Paramètres</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+              <i class="fas fa-user-circle me-1"></i><span id="username">Utilisateur</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#" id="profileLink">Profil</a></li>
+              <li><a class="dropdown-item" href="#" id="logoutLink">Déconnexion</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenu principal -->
+  <div class="container-fluid">
+    <div class="row mt-3">
+      <!-- Panneau latéral -->
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-header bg-primary text-white">
+            <i class="fas fa-bell me-2"></i>Alertes
+            <span class="badge rounded-pill bg-danger float-end" id="alertCount">0</span>
+          </div>
+          <div class="card-body p-0">
+            <ul class="list-group list-group-flush" id="alertsList">
+              <!-- Les alertes seront ajoutées ici dynamiquement -->
+            </ul>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header bg-info text-white">
+            <i class="fas fa-chart-line me-2"></i>Tendances
+          </div>
+          <div class="card-body">
+            <canvas id="waterLevelChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Carte -->
+      <div class="col-md-9">
+        <div class="view active" id="mapView">
+          <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+              <span><i class="fas fa-map me-2"></i>Carte de surveillance</span>
+              <div>
+                <button class="btn btn-sm btn-light" id="togglePrecipitation">
+                  <i class="fas fa-cloud-rain"></i> Animation pluie
+                </button>
+                <button class="btn btn-sm btn-light" id="toggleLayers">
+                  <i class="fas fa-layer-group"></i> Couches
+                </button>
+                <button class="btn btn-sm btn-light" id="toggleLegend">
+                  <i class="fas fa-info-circle"></i> Légende
+                </button>
+              </div>
+            </div>
+            <div class="card-body p-0">
+              <div id="mapContainer" style="height: 70vh; position: relative;">
+                <div id="map"></div>
+                <!-- Effet de pluie -->
+                <div id="rainEffect" class="rain-effect">
+                  <!-- Les gouttes de pluie seront générées dynamiquement -->
+                </div>
+                <!-- Légende -->
+                <div id="legend" class="legend">
+                  <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(255, 0, 0, 0.3);"></div>
+                    <div class="legend-label">Risque élevé</div>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(255, 255, 0, 0.3);"></div>
+                    <div class="legend-label">risque moyen</div>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(0, 255, 0, 0.3);"></div>
+                    <div class="legend-label">Pas de risque</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vue Données Sentinel -->
+        <div class="view" id="sentinelView">
+          <div class="card">
+            <div class="card-header bg-primary text-white">
+              <i class="fas fa-satellite me-2"></i>Données Sentinel
+            </div>
+            <div class="card-body">
+              <p>Données Sentinel simulées.</p>
+              <ul id="sentinelDataList">
+                <li>Image satellite 1 - Date: 2023-10-01</li>
+                <li>Image satellite 2 - Date: 2023-10-02</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vue Prédictions -->
+        <div class="view" id="predictionsView">
+          <div class="card">
+            <div class="card-header bg-primary text-white">
+              <i class="fas fa-chart-line me-2"></i>Prédictions
+            </div>
+            <div class="card-body">
+              <p>Prédictions simulées basées sur les données des capteurs.</p>
+              <canvas id="predictionsChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vue Historique -->
+        <div class="view" id="historicalView">
+          <div class="card">
+            <div class="card-header bg-primary text-white">
+              <i class="fas fa-history me-2"></i>Historique
+            </div>
+            <div class="card-body">
+              <p>Historique des données des capteurs.</p>
+              <ul id="historicalDataList">
+                <li>Capteur 1 - Niveau d'eau: 3.5 m (2023-10-01)</li>
+                <li>Capteur 2 - Niveau d'eau: 4.5 m (2023-10-01)</li>
+                <li>Capteur 3 - Niveau d'eau: 5.5 m (2023-10-01)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vue Paramètres -->
+        <div class="view" id="settingsView">
+          <div class="card">
+            <div class="card-header bg-primary text-white">
+              <i class="fas fa-cog me-2"></i>Paramètres
+            </div>
+            <div class="card-body">
+              <form id="settingsForm">
+                <div class="mb-3">
+                  <label for="waterLevelThreshold" class="form-label">Seuil de niveau d'eau (m)</label>
+                  <input type="number" class="form-control" id="waterLevelThreshold" value="5.0" step="0.1">
+                </div>
+                <div class="mb-3">
+                  <label for="precipitationThreshold" class="form-label">Seuil de précipitations (mm)</label>
+                  <input type="number" class="form-control" id="precipitationThreshold" value="120" step="1">
+                </div>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  
-  <!-- Bouton pour afficher/cacher la légende -->
-  <button id="toggleLegend">Masquer la légende</button>
-  
-  <!-- Panneau de légende draggable -->
-  <div id="legend">
-    <b>Légende</b><br>
-    <div style="display:inline-flex; align-items:center;">
-      <div style="position: relative; width:48px; height:48px;">
-        <img src="https://img.icons8.com/fluency/48/000000/weather-station.png" style="width:48px;height:48px;">
-        <img src="https://img.icons8.com/fluency/16/000000/radio-tower.png" style="width:16px;height:16px; position: absolute; top:-4px; left:16px;">
-      </div>&nbsp; Capteur IoT (Station avec antenne)
-    </div><br>
-    <b>Paramètres mesurés :</b><br>
-    <img src="https://img.icons8.com/fluency/24/000000/water.png" width="16" height="16"> Niveau d'eau<br>
-    <img src="https://img.icons8.com/fluency/24/000000/temperature.png" width="16" height="16"> Température<br>
-    <img src="https://img.icons8.com/fluency/24/000000/hygrometer.png" width="16" height="16"> Humidité<br>
-    <img src="https://img.icons8.com/fluency/24/000000/barometer.png" width="16" height="16"> Pression<br>
-    <img src="https://img.icons8.com/fluency/24/000000/raindrop.png" width="16" height="16"> Précipitations<br>
-    <img src="https://img.icons8.com/fluency/24/000000/landscape.png" width="16" height="16"> Altitude<br>
-    <b>Alertes :</b><br>
-    Débordement du fleuve : Niveau d'eau > 4.0 m (rouge)<br>
-    Maisons inondées : Précipitations > 100 mm (bleu)
-  </div>
-  
+
+  <!-- Scripts externes -->
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/shpjs/dist/shp.js"></script> <!-- Pour charger les Shapefiles -->
+
+  <!-- Scripts personnalisés -->
   <script>
-    /********* Initialisation de la carte *********/
-    var map = L.map('map').setView([13.5128, 2.1157], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-    
-    /********* Nouvelle icône composite pour les capteurs *********/
-    var sensorIcon = L.divIcon({
-      html: '<div style="position: relative; width:48px; height:48px;">' +
-              '<img src="https://img.icons8.com/fluency/48/000000/weather-station.png" style="width:48px;height:48px;">' +
-              '<img src="https://img.icons8.com/fluency/16/000000/radio-tower.png" style="width:16px;height:16px; position: absolute; top:-4px; left:16px;">' +
-            '</div>',
-      iconSize: [48, 48],
-      className: ''
-    });
-    
-    /********* Définition des 4 capteurs installés le long du fleuve *********/
-    var sensorsData = [
-    { id: 1, name: "Capteur 1 - Bord du Fleuve", lat: 13.473472, lng: 2.127530, altitude: 5.0, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
-    { id: 2, name: "Capteur 2 - Bord du Fleuve", lat: 13.496835, lng: 2.115979, altitude: 5.5, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
-    { id: 3, name: "Capteur 3 - Bord du Fleuve", lat: 13.511860, lng: 2.089501, altitude: 4.5, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null },
-    { id: 4, name: "Capteur 4 - Bord du Fleuve", lat: 13.519907, lng: 2.072473, altitude: 6.0, waterLevel: 0, temperature: 0, humidity: 0, pressure: 0, precipitation: 0, alertOverlayRiver: null, alertOverlayFlood: null }
+    // Initialisation de la carte
+    let map;
+    let sensorMarkers = [];
+    let rainEffectActive = false;
+    let precipitationValue = 0; // Valeur des précipitations
+    const openWeatherMapApiKey = "9ac0b9b823a3146242e05dd5ab50c5b4"; // Votre clé API OpenWeatherMap
+
+    // Données géographiques pour Niamey
+    const niameyBoundaries = {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": { "name": "Niamey", "type": "city" },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [2.0531, 13.4783], [2.0531, 13.5472], [2.1775, 13.5472], [2.1775, 13.4783], [2.0531, 13.4783]
+              ]
+            ]
+          }
+        }
+      ]
+    };
+
+    // Données simulées pour les capteurs IoT
+    const sensorsData = [
+      { id: 1, name: "Capteur 1", lat: 13.473472, lng: 2.127530, waterLevel: 3.5, precipitation: 80, temperature: 28.5, humidity: 60, pressure: 1013 },
+      { id: 2, name: "Capteur 2", lat: 13.496835, lng: 2.115979, waterLevel: 4.5, precipitation: 120, temperature: 29.0, humidity: 65, pressure: 1012 },
+      { id: 3, name: "Capteur 3", lat: 13.511860, lng: 2.089501, waterLevel: 5.5, precipitation: 150, temperature: 29.5, humidity: 70, pressure: 1011 },
+      { id: 4, name: "Capteur 4", lat: 13.519907, lng: 2.072473, waterLevel: 6.0, precipitation: 200, temperature: 30.0, humidity: 75, pressure: 1010 }
     ];
-    
-    sensorsData.forEach(function(sensor) {
-      sensor.marker = L.marker([sensor.lat, sensor.lng], { icon: sensorIcon }).addTo(map);
-      sensor.marker.bindPopup(generatePopupContent(sensor));
-    });
-    
-    function generatePopupContent(sensor) {
-      return `<b>${sensor.name}</b><br>
-        <img src="https://img.icons8.com/fluency/24/000000/water.png" width="16" height="16"> Niveau d'eau : ${sensor.waterLevel.toFixed(1)} m<br>
-        <img src="https://img.icons8.com/fluency/24/000000/temperature.png" width="16" height="16"> Température : ${sensor.temperature.toFixed(1)}°C<br>
-        <img src="https://img.icons8.com/fluency/24/000000/hygrometer.png" width="16" height="16"> Humidité : ${sensor.humidity.toFixed(0)}%<br>
-        <img src="https://img.icons8.com/fluency/24/000000/barometer.png" width="16" height="16"> Pression : ${sensor.pressure.toFixed(0)} hPa<br>
-        <img src="https://img.icons8.com/fluency/24/000000/raindrop.png" width="16" height="16"> Précipitations : ${sensor.precipitation.toFixed(1)} mm<br>
-        <img src="https://img.icons8.com/fluency/24/000000/landscape.png" width="16" height="16"> Altitude : ${sensor.altitude.toFixed(1)} m`;
-    }
-    
-    function updateSensors() {
-      sensorsData.forEach(function(sensor) {
-        sensor.waterLevel = getRandom(3.0, 6.0);
-        sensor.temperature = getRandom(25, 35);
-        sensor.humidity = getRandom(60, 90);
-        sensor.pressure = getRandom(1008, 1020);
-        sensor.precipitation = getRandom(0, 150);
-    
-        sensor.marker.setPopupContent(generatePopupContent(sensor));
-    
-        if(sensor.waterLevel > 4.0) {
-          if(!sensor.alertOverlayRiver) {
-            sensor.alertOverlayRiver = L.circle([sensor.lat, sensor.lng], {
-              color: "red",
-              fillColor: "#f03",
-              fillOpacity: 0.5,
-              radius: 300
-            }).addTo(map)
-              .bindPopup(`<b>Débordement du fleuve</b><br>Niveau d'eau : ${sensor.waterLevel.toFixed(1)} m`);
+
+    // Zones tampons obliques autour du fleuve
+    const bufferZones = [
+      {
+        coordinates: [
+          [2.0531, 13.4783], [2.0775, 13.4872], [2.0975, 13.4972], [2.1175, 13.5072], [2.1375, 13.5172], [2.1575, 13.5272], [2.1775, 13.5372]
+        ],
+        color: "rgba(255, 0, 0, 0.3)", // Rouge
+        width: 500
+      },
+      {
+        coordinates: [
+          [2.0531, 13.4783], [2.0775, 13.4872], [2.0975, 13.4972], [2.1175, 13.5072], [2.1375, 13.5172], [2.1575, 13.5272], [2.1775, 13.5372]
+        ],
+        color: "rgba(255, 255, 0, 0.3)", // Jaune
+        width: 1000
+      },
+      {
+        coordinates: [
+          [2.0531, 13.4783], [2.0775, 13.4872], [2.0975, 13.4972], [2.1175, 13.5072], [2.1375, 13.5172], [2.1575, 13.5272], [2.1775, 13.5372]
+        ],
+        color: "rgba(0, 255, 0, 0.3)", // Vert
+        width: 1500
+      }
+    ];
+
+    // Initialisation de la carte
+    function initMap() {
+      map = L.map('map').setView([13.5128, 2.1157], 12);
+
+      // Couche de base - OpenStreetMap
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Ajout des limites administratives de Niamey
+      L.geoJSON(niameyBoundaries, {
+        style: {
+          color: "#333",
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.1
+        }
+      }).addTo(map);
+
+      // Ajout des zones tampons obliques
+      bufferZones.forEach(zone => {
+        L.polyline(zone.coordinates, {
+          color: zone.color,
+          weight: zone.width,
+          opacity: 0.5
+        }).addTo(map);
+      });
+
+      // Ajout des capteurs IoT
+      updateSensorsOnMap(sensorsData);
+
+      // Gestion des couches
+      document.getElementById('toggleLayers').addEventListener('click', function () {
+        bufferZones.forEach(zone => {
+          if (map.hasLayer(zone)) {
+            map.removeLayer(zone);
           } else {
-            sensor.alertOverlayRiver.setStyle({ color: "red", fillColor: "#f03" });
-            sensor.alertOverlayRiver.setPopupContent(`<b>Débordement du fleuve</b><br>Niveau d'eau : ${sensor.waterLevel.toFixed(1)} m`);
+            zone.addTo(map);
           }
-        } else {
-          if(sensor.alertOverlayRiver) {
-            map.removeLayer(sensor.alertOverlayRiver);
-            sensor.alertOverlayRiver = null;
-          }
-        }
-    
-        if(sensor.precipitation > 100) {
-          if(!sensor.alertOverlayFlood) {
-            sensor.alertOverlayFlood = L.circle([sensor.lat, sensor.lng], {
-              color: "blue",
-              fillColor: "#00f",
-              fillOpacity: 0.3,
-              radius: 300
-            }).addTo(map)
-              .bindPopup(`<b>Maisons inondées</b><br>Précipitations : ${sensor.precipitation.toFixed(1)} mm`);
-          } else {
-            sensor.alertOverlayFlood.setStyle({ color: "blue", fillColor: "#00f" });
-            sensor.alertOverlayFlood.setPopupContent(`<b>Maisons inondées</b><br>Précipitations : ${sensor.precipitation.toFixed(1)} mm`);
-          }
-        } else {
-          if(sensor.alertOverlayFlood) {
-            map.removeLayer(sensor.alertOverlayFlood);
-            sensor.alertOverlayFlood = null;
-          }
-        }
+        });
+      });
+
+      // Gestion de la légende
+      document.getElementById('toggleLegend').addEventListener('click', function () {
+        const legend = document.getElementById('legend');
+        legend.classList.toggle('active');
       });
     }
-    
-    function getRandom(min, max) {
-      return Math.random() * (max - min) + min;
-    }
-    
-    setInterval(updateSensors, 5000);
-    updateSensors();
-    
-    /********* Effet de précipitations (pluie) *********/
-    var rainCanvas = document.getElementById('rainCanvas');
-    var rainCtx = rainCanvas.getContext('2d');
-    
-    function resizeRainCanvas() {
-      rainCanvas.width = document.getElementById('map').offsetWidth;
-      rainCanvas.height = document.getElementById('map').offsetHeight;
-    }
-    resizeRainCanvas();
-    window.addEventListener('resize', resizeRainCanvas);
-    
-    var raindrops = [];
-    var numDrops = 200;
-    for (var i = 0; i < numDrops; i++) {
-      raindrops.push({
-        x: Math.random() * rainCanvas.width,
-        y: Math.random() * rainCanvas.height,
-        length: Math.random() * 20 + 10,
-        speed: Math.random() * 4 + 4
+
+    // Mise à jour des capteurs sur la carte
+    function updateSensorsOnMap(sensorsData) {
+      sensorsData.forEach(sensor => {
+        const sensorIcon = L.divIcon({
+          html: `<div class="sensor-marker ${getMarkerStatusClass(sensor)}">
+                  <i class="fas fa-satellite-dish"></i>
+                 </div>`,
+          className: '',
+          iconSize: [32, 32]
+        });
+
+        const marker = L.marker([sensor.lat, sensor.lng], { icon: sensorIcon }).addTo(map);
+        marker.bindPopup(generateSensorPopup(sensor));
       });
     }
-    
-    function animateRain() {
-      rainCtx.clearRect(0, 0, rainCanvas.width, rainCanvas.height);
-      rainCtx.strokeStyle = 'rgba(0,162,232,0.7)';
-      rainCtx.lineWidth = 1.5;
-      rainCtx.lineCap = 'round';
-      for (var i = 0; i < numDrops; i++) {
-        var drop = raindrops[i];
-        rainCtx.beginPath();
-        rainCtx.moveTo(drop.x, drop.y);
-        rainCtx.lineTo(drop.x, drop.y + drop.length);
-        rainCtx.stroke();
-        drop.y += drop.speed;
-        if (drop.y > rainCanvas.height) {
-          drop.y = -drop.length;
-          drop.x = Math.random() * rainCanvas.width;
+
+    // Générer le contenu de la popup pour un capteur
+    function generateSensorPopup(sensor) {
+      return `
+        <div class="sensor-popup">
+          <h6 class="mb-2">${sensor.name}</h6>
+          <div class="sensor-property">
+            <i class="fas fa-water text-primary"></i> Niveau d'eau: <b>${sensor.waterLevel.toFixed(2)} m</b>
+          </div>
+          <div class="sensor-property">
+            <i class="fas fa-cloud-rain text-info"></i> Précipitations: <b>${sensor.precipitation.toFixed(1)} mm</b>
+          </div>
+          <div class="sensor-property">
+            <i class="fas fa-temperature-high text-warning"></i> Température: <b>${sensor.temperature.toFixed(1)}°C</b>
+          </div>
+          <div class="sensor-property">
+            <i class="fas fa-tint text-primary"></i> Humidité: <b>${sensor.humidity.toFixed(0)}%</b>
+          </div>
+          <div class="sensor-property">
+            <i class="fas fa-tachometer-alt text-secondary"></i> Pression: <b>${sensor.pressure.toFixed(0)} hPa</b>
+          </div>
+        </div>
+      `;
+    }
+
+    // Déterminer la classe CSS pour un marqueur selon son état
+    function getMarkerStatusClass(sensor) {
+      if (sensor.waterLevel > 5.0 || sensor.precipitation > 120) {
+        return 'status-critical';
+      } else if (sensor.waterLevel > 4.0 || sensor.precipitation > 100) {
+        return 'status-warning';
+      }
+      return 'status-normal';
+    }
+
+    // Effet de pluie
+    function toggleRainEffect() {
+      const rainEffect = document.getElementById('rainEffect');
+      rainEffectActive = !rainEffectActive;
+      rainEffect.classList.toggle('active', rainEffectActive);
+
+      if (rainEffectActive) {
+        // Simuler l'augmentation des précipitations
+        precipitationValue += 50;
+        if (precipitationValue >= 200) {
+          alert("Alerte : Zones inondées détectées !");
         }
-      }
-      requestAnimationFrame(animateRain);
-    }
-    animateRain();
-    
-    /********* Fonction de simulation de connexion Android *********/
-    function simulerAndroid() {
-      var lat = 13.5128, lon = 2.1157;
-      var alerteDetectee = sensorsData.some(sensor => sensor.waterLevel > 4.0 || sensor.precipitation > 100);
-      var popupMsg = `<b>Utilisateur Android</b><br>Connexion simulée depuis votre domicile.<br>`;
-      popupMsg += alerteDetectee ? `<span style="color:red;">Alerte détectée</span>` : `<span style="color:green;">Aucune alerte</span>`;
-      
-      var androidIcon = L.divIcon({
-        html: '<img src="https://img.icons8.com/color/48/000000/android-os.png" width="48" height="48">',
-        iconSize: [48, 48],
-        className: ''
-      });
-      
-      L.marker([lat, lon], { icon: androidIcon }).addTo(map)
-        .bindPopup(popupMsg).openPopup();
-    }
-    
-    /********* Fonctions d'authentification et géolocalisation *********/
-    function inscrireUtilisateur() {
-      var email = document.getElementById('email').value;
-      var password = document.getElementById('password').value;
-      if (!email || !password) {
-        alert("Veuillez remplir tous les champs");
-        return;
-      }
-      if (localStorage.getItem(email)) {
-        alert("Utilisateur déjà inscrit");
-      } else {
-        localStorage.setItem(email, password);
-        alert("Inscription réussie");
-        // Masquer le formulaire d'authentification et afficher le conteneur principal (carte + légende)
-        document.getElementById('authContainer').style.display = 'none';
-        document.getElementById('mainContainer').style.display = 'flex';
-      }
-    }
-    function connexionUtilisateur() {
-      var email = document.getElementById('email').value;
-      var password = document.getElementById('password').value;
-      if (!email || !password) {
-        alert("Veuillez remplir tous les champs");
-        return;
-      }
-      var storedPassword = localStorage.getItem(email);
-      if (storedPassword && storedPassword === password) {
-        localStorage.setItem('currentUser', email);
-        alert("Connexion réussie");
-        document.getElementById('authContainer').style.display = 'none';
-        document.getElementById('mainContainer').style.display = 'flex';
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition((position) => {
-            var lat = position.coords.latitude;
-            var lon = position.coords.longitude;
-            var userIcon = L.divIcon({
-              html: '<img src="https://img.icons8.com/fluency/48/000000/marker.png" width="48" height="48">',
-              iconSize: [48, 48],
-              className: ''
-            });
-            L.marker([lat, lon], { icon: userIcon }).addTo(map)
-              .bindPopup(`<b>Votre position</b>`).openPopup();
-          });
+        updateSensorValues();
+
+        // Ajouter des gouttes de pluie
+        for (let i = 0; i < 100; i++) {
+          const drop = document.createElement('div');
+          drop.className = 'rain';
+          drop.style.left = `${Math.random() * 100}%`;
+          drop.style.animationDuration = `${0.5 + Math.random()}s`;
+          rainEffect.appendChild(drop);
         }
       } else {
-        alert("Email ou mot de passe incorrect");
+        precipitationValue = 0;
+        updateSensorValues();
+        rainEffect.innerHTML = '';
       }
     }
-    function deconnexionUtilisateur() {
-      localStorage.removeItem('currentUser');
-      alert("Déconnexion réussie");
+
+    // Mettre à jour les valeurs des capteurs
+    function updateSensorValues() {
+      sensorsData.forEach(sensor => {
+        sensor.precipitation = precipitationValue;
+        sensor.waterLevel = 3.5 + (precipitationValue / 50);
+        sensor.temperature = 28 + (precipitationValue / 100);
+        sensor.humidity = 60 + (precipitationValue / 10);
+        sensor.pressure = 1013 - (precipitationValue / 20);
+      });
+      updateSensorsOnMap(sensorsData);
+      updateChart(); // Mettre à jour le graphique
+      checkForAlerts(); // Vérifier les alertes après la mise à jour des capteurs
     }
-    
-    /********* Rendre la légende draggable *********/
-    dragElement(document.getElementById("legend"));
-    function dragElement(elmnt) {
-      var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-      elmnt.onmousedown = dragMouseDown;
-      function dragMouseDown(e) {
-        e = e || window.event;
+
+    // Récupérer les données météorologiques en temps réel
+    async function fetchWeatherData(lat, lng) {
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${openWeatherMapApiKey}&units=metric`;
+      const response = await fetch(url);
+      const data = await response.json();
+      return data;
+    }
+
+    // Fonction pour détecter les alertes
+    function checkForAlerts() {
+      const alertsList = document.getElementById('alertsList');
+      const alertCount = document.getElementById('alertCount');
+      alertsList.innerHTML = ''; // Réinitialiser la liste des alertes
+      let count = 0;
+
+      sensorsData.forEach(sensor => {
+        if (sensor.waterLevel > 5.0 || sensor.precipitation > 120) {
+          const alertItem = document.createElement('li');
+          alertItem.className = 'list-group-item list-group-item-danger';
+          alertItem.innerHTML = `
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>${sensor.name}</strong> : 
+            ${sensor.waterLevel > 5.0 ? `Niveau d'eau élevé (${sensor.waterLevel.toFixed(2)} m)` : ''}
+            ${sensor.precipitation > 120 ? `Précipitations élevées (${sensor.precipitation.toFixed(1)} mm)` : ''}
+          `;
+          alertsList.appendChild(alertItem);
+          count++;
+        }
+      });
+
+      // Mettre à jour le compteur d'alertes
+      alertCount.textContent = count;
+    }
+
+    // Initialisation du graphique
+    let waterLevelChart;
+    function initChart() {
+      const ctx = document.getElementById('waterLevelChart').getContext('2d');
+      waterLevelChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: sensorsData.map(sensor => sensor.name), // Noms des capteurs comme étiquettes
+          datasets: [{
+            label: 'Niveau d\'eau (m)',
+            data: sensorsData.map(sensor => sensor.waterLevel), // Données des capteurs
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 2,
+            fill: false
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    // Mettre à jour le graphique
+    function updateChart() {
+      waterLevelChart.data.datasets[0].data = sensorsData.map(sensor => sensor.waterLevel);
+      waterLevelChart.update();
+    }
+
+    // Gestion des vues
+    function showView(viewId) {
+      // Masquer toutes les vues
+      document.querySelectorAll('.view').forEach(view => {
+        view.classList.remove('active');
+      });
+
+      // Afficher la vue sélectionnée
+      document.getElementById(viewId).classList.add('active');
+
+      // Mettre à jour la classe active dans la barre de navigation
+      document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+      });
+      document.querySelector(`[data-view="${viewId.replace('View', '')}"]`).classList.add('active');
+    }
+
+    // Initialiser la carte et les événements
+    document.addEventListener('DOMContentLoaded', async function () {
+      initMap();
+      initChart(); // Initialiser le graphique
+
+      // Mettre à jour les valeurs des capteurs avec les données météorologiques réelles
+      for (const sensor of sensorsData) {
+        const weatherData = await fetchWeatherData(sensor.lat, sensor.lng);
+        sensor.temperature = weatherData.main.temp;
+        sensor.humidity = weatherData.main.humidity;
+        sensor.pressure = weatherData.main.pressure;
+      }
+      updateSensorsOnMap(sensorsData);
+      updateChart(); // Mettre à jour le graphique avec les nouvelles données
+      checkForAlerts(); // Vérifier les alertes initiales
+
+      // Gestionnaire d'événement pour le bouton de pluie
+      document.getElementById('togglePrecipitation').addEventListener('click', toggleRainEffect);
+
+      // Gestion des clics sur les liens de la barre de navigation
+      document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', function (e) {
+          e.preventDefault();
+          const viewId = this.getAttribute('data-view') + 'View';
+          showView(viewId);
+        });
+      });
+
+      // Gestion du formulaire des paramètres
+      document.getElementById('settingsForm').addEventListener('submit', function (e) {
         e.preventDefault();
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
-      }
-      function elementDrag(e) {
-        e = e || window.event;
-        e.preventDefault();
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
-        elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
-      }
-      function closeDragElement() {
-        document.onmouseup = null;
-        document.onmousemove = null;
-      }
-    }
-    
-    /********* Gestion du toggle de la légende *********/
-    // Pour ordinateur, la légende est visible par défaut,
-    // pour mobile (width < 768px) elle est cachée.
-    document.addEventListener("DOMContentLoaded", function() {
-      var legend = document.getElementById("legend");
-      var toggleBtn = document.getElementById("toggleLegend");
-      if (window.innerWidth >= 768) {
-        legend.style.display = "block";
-        toggleBtn.textContent = "Masquer la légende";
-      } else {
-        legend.style.display = "none";
-        toggleBtn.textContent = "Afficher la légende";
-      }
-    });
-    
-    document.getElementById('toggleLegend').addEventListener('click', function() {
-      var legend = document.getElementById('legend');
-      if (legend.style.display === 'none' || legend.style.display === '') {
-        legend.style.display = 'block';
-        this.textContent = 'Masquer la légende';
-      } else {
-        legend.style.display = 'none';
-        this.textContent = 'Afficher la légende';
-      }
+        const waterLevelThreshold = parseFloat(document.getElementById('waterLevelThreshold').value);
+        const precipitationThreshold = parseFloat(document.getElementById('precipitationThreshold').value);
+        alert(`Seuils mis à jour : Niveau d'eau = ${waterLevelThreshold} m, Précipitations = ${precipitationThreshold} mm`);
+      });
     });
   </script>
 </body>
